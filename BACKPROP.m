@@ -13,9 +13,16 @@ d = 85;
 wsize = 1;
 
 %保存場所%
-folder = './source';
+folder1 = './source';
 fname_prefix = '';
 time = (start_num:end_num).*(1/Fs)
+
+% 対象画像のパス
+fname1 = sprintf('%06d',v+start_num-1);
+fname2 = strcat(folder1,strcat(fname_prefix,fname1));
+
+% 基準画像のパス
+fname3 = '';
 
 %%%%%%%%%中身の無い行列を作成%%%%%%%%%
 
@@ -32,9 +39,6 @@ for v = 1:end_num - start_num + 1;
 
 %%%%%%%%%ホログラム画像読込%%%%%%%%%
 %im2doubleを切り抜き前にするか後にするか%
-
-fname1 = sprintf('%06d',v+start_num-1);
-fname2 = strcat(folder1,strcat(fname_prefix,fname1));
 Int_o = im2double(imread(fname2, 'tif'));
 Int_c = imcrop(Int_o, []);
 Int_r = imresize(Int_c,[1024 1024]);
@@ -79,6 +83,28 @@ imshow(angle(Recon));
 phase2(1,v) = angle(Recon(SIZE/2,SIZE/2));
 phase3 = unwrap(phase2);
 
+%%%%%%%%%位相変化量%%%%%%%%%
+
+% 画像をデータ型に変換
+ref_img = im2double(imread(fname3, 'tif'));
+
+% 位相差を保存する行列の初期化
+phase_diffs = zeros(SIZE,SIZE, end_num)
+
+% 計算部
+for i = start_num : end_num
+    phase_diff = atan2(imag(ref_img.*conj(Int_o)), real(ref_img.*conj(Int_o)));
+
+    % 位相差を保存
+    phase_diffs(:, :, i) = phase_diff;
+
+end
+
+for i = start_num : end_num
+    figure;
+    imshow(phase_diffs(:,:,i), []);
+    title['Phase Difference', num2str(i)];
+end
 
 
 
