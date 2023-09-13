@@ -1,5 +1,5 @@
 % フォルダ内の画像ファイルのパスを取得
-imageFolderPath = 'D:\data\0828\source'; % 画像フォルダのパスを指定
+imageFolderPath = 'D:\data\0912\source'; % 画像フォルダのパスを指定
 imageFiles = dir(fullfile(imageFolderPath, '*.tif')); % 拡張子に合わせて変更
 
 % 画像ファイル名から下六桁の連番を取得
@@ -10,9 +10,9 @@ for i = 1:length(imageFiles)
 end
 
 % 基準画像のインデックスと差分計算範囲を指定
-referenceImageIndex = 3000; % 基準となる画像のインデックスを指定
-startImageIndex = 4000;     % 位相変化量を計算を始める画像のインデックスを指定
-endImageIndex = 27000;       % 位相変化量を計算を終わる画像のインデックスを指定
+referenceImageIndex = 1; % 基準となる画像のインデックスを指定
+startImageIndex = 2;     % 位相変化量の計算を始める画像のインデックスを指定
+endImageIndex = 10918;       % 位相変化量の計算を終わる画像のインデックスを指定
 
 % 基準画像を読み込む
 referenceImage = imread(fullfile(imageFolderPath, imageFiles(referenceImageIndex).name));

@@ -4,15 +4,15 @@ i = sqrt(-1);
 tic;
 
 %%%%%%%%%%% ここで設定します %%%%%%%%%%%
-%長さ単位はmmにそろえる%
+%長さ単位はmにそろえる%
 save_file = true;
-SIZE = 1024;    % 画像のサイズ
-start_num = 4000;  % 処理を開始する画像の番号
-end_num = 5200; % 処理を終了する画像の番号
+SIZE = 512;    % 画像のサイズ
+start_num = 1;  % 処理を開始する画像の番号
+end_num = 33674; % 処理を終了する画像の番号
 Fs = 7200; % カメラのフレームレート(枚/s)
 wsize1 = 1;  % 切り抜きサイズの設定 0だと1x1 1だと3x3 2だと5x5...
-folder1 = 'D:\data\0828\source\';  % フォルダ指定
-fname_prefix = '2k_0.17w_27000_512_C001H001S0001'; % ファイル名の頭から後ろ6桁と拡張子を抜いたもの
+folder1 = 'D:\data\0913\source\';  % フォルダ指定
+fname_prefix = '7.2k_0.12w_512_33674_C001H001S0001'; % ファイル名の頭から後ろ6桁と拡張子を抜いたもの
 seconds = (start_num:end_num) * (1/Fs); % 時間
 sizex = SIZE;
 sizey = SIZE;
@@ -24,9 +24,9 @@ for numPath = 2:2
         case 1
             % numPathが1の場合の処理
         case 2
-            centerx = 534; % 38  *128/96; % 経路2
-            centery = 507;
-            d = 700;
+            centerx = 266; % 38  *128/96; % 経路2
+            centery = 250;
+            d = 0.7;
             pathName = '2_';
             % numPathが2の場合の処理
         case 3
@@ -38,7 +38,7 @@ for numPath = 2:2
     %%%%%%%%%%%% 設定はここまで %%%%%%%%%%%%
     
     %バッチ処理
-    batch_size =100; % バッチのサイズ
+    batch_size =10000; % バッチのサイズ
     num_batches = ceil((end_num - start_num + 1) / batch_size);
     all_phase1 = cell(1, num_batches);
     total_processing_time = 0; % 合計処理時間の初期化
@@ -56,8 +56,8 @@ for numPath = 2:2
            fname2 = strcat(folder1,strcat(fname_prefix,fname1));  %ファイル名作成
            Int_1 = im2double(imread(fname2,'tif')); %読み込み
            Int_1 = imadjust(Int_1);
-           Int_1 = imcrop(Int_1,[91.5 158.5 83 81]);
-           Int_1 = imresize(Int_1,[1024 1024]);
+           Int_1 = imcrop(Int_1,[231.5 420.5 35 33]); %干渉縞の切り抜き位置
+           Int_1 = imresize(Int_1,[512 512]); %リサイズ
            %figure(1);
            %imshow(Int_1,[]);
         
@@ -84,7 +84,7 @@ for numPath = 2:2
            Int_1 = Int_1.*f;  %切り抜き
            Int_1 = circshift(Int_1,[SIZEY/2+1-centery SIZEX/2+1-centerx]);  %切り抜き画像を中心に移動
            Int_1 = ifft2(ifftshift(Int_1));
-           %Int_1 = fftshift(Int_1); %これで撮影面での物体光が取り出せた
+           Int_1 = fftshift(Int_1); %これで撮影面での物体光が取り出せた
            %imshow(log(abs(Int_1)),[]);
     
             % 逆伝播計算
@@ -117,7 +117,7 @@ for numPath = 2:2
         close(h);
     end
     phase1 = cat(2, all_phase1{:});
-    %phase1 = unwrap(phase1);  % 位相アンラップ(-πとπの間で飛ばないようにする)
+    phase1 = unwrap(phase1);  % 位相アンラップ(-πとπの間で飛ばないようにする)
 end
 
 
@@ -134,11 +134,12 @@ if save_file
     figure(1121);
     plot(seconds,phase1)
     title("Time-Phase(RAW)")
-    savefig(strcat(sprintf("%d_%dx%d",numPath,ws,ws),"_rawdata_B"));
+    savefig_path = (fullfile(folder1, "phase_rawB"));
+    savefig(savefig_path);
 
     %%%%%ノイズ除去のため、近くの点を取って平均化%%%%%
-    phase2=zeros(start_num,end_num-start_num+1);
-    phase3=zeros(start_num,end_num-start_num);
+    phase2=zeros(1,end_num-start_num+1);
+    phase3=zeros(1,end_num-start_num);
     for v=1:end_num-start_num-10
        phase2(1,v)=phase1(1,v)-mean(phase1(1,v:v+10));
     end
@@ -154,7 +155,7 @@ if save_file
     end
 
     %%%%%平均化したデータをcsvに出力%%%%%
-    fname3 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_aphase_B.csv');
+    fname3 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_Aphase_B.csv');
     aphase=[seconds;phase2];
     csvwrite(fname3,aphase');
     figure(1122);
@@ -162,17 +163,18 @@ if save_file
     title('Time-Phase(AVE.)');
     xlabel('Time [s]');
     ylabel('Phase');
-    savefig(strcat(sprintf("%d_%dx%d",numPath,ws,ws),"_avedataB"));
+    savefig_path = (fullfile(folder1, "phase_aveB"));
+    savefig(savefig_path);
 
   
     %%%%%音声ファイル出力のためのノーマライズ%%%%%
-    %max1 = max(phase2(1,:));
-    %min1 = min(phase2(1,:)); 
-    %phase4 = 2.0*(phase2-min1)/(max1-min1) - 1.00;
+    max1 = max(phase2(1,:));
+    min1 = min(phase2(1,:)); 
+    phase4 = 2.0*(phase2-min1)/(max1-min1) - 1.00;
 
     %%%%%音声ファイル出力%%%%%
-    %fname4 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'output.wav');
-    %audiowrite(fname4,phase4,Fs);
+    fname4 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'output.wav');
+    audiowrite(fname4,phase4,Fs);
 
     %figure(4);  %音声データをプロット
     %plot(phase4,'r');
@@ -192,7 +194,8 @@ plot(f0_1,phase111);
 title("raw data");
 xlabel('Frequency [Hz]');
 ylabel('Spectral intensity []');
-savefig("spectral_raw_B");
+savefig_path = (fullfile(folder1, "spectral_rawB"));
+savefig(savefig_path);
 fname6 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_rfreq_B.csv');
 rfreq=[f0_1;phase111];
 csvwrite(fname6,rfreq');
@@ -207,8 +210,9 @@ plot(f0_1,phase112);
 title("average data");
 xlabel('Frequency [Hz]');
 ylabel('Spectral intensity []');
-savefig("spectral_ave_B");
-fname7 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_nfreq_B.csv');
+savefig_path = (fullfile(folder1, "spectral_aveB"));
+savefig(savefig_path);
+fname7 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_Afreq_B.csv');
 nfreq=[f0_1;phase112];
 csvwrite(fname7,nfreq');
 

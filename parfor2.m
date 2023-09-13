@@ -1,4 +1,6 @@
 close all;
+% 現在の日時を取得
+currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
 
 i = sqrt(-1);
 tic;
@@ -8,11 +10,11 @@ tic;
 save_file = true;
 SIZE = 1024;    % 画像のサイズ
 start_num = 4000;  % 処理を開始する画像の番号
-end_num = 11200; % 処理を終了する画像の番号
+end_num = 14000; % 処理を終了する画像の番号
 Fs = 7200; % カメラのフレームレート(枚/s)
 wsize1 = 1;  % 切り抜きサイズの設定 0だと1x1 1だと3x3 2だと5x5...
 folder1 = 'D:\data\0828\source\';  % フォルダ指定
-fname_prefix = '2k_0.17w_27000_512_C001H001S0001'; % ファイル名の頭から後ろ6桁と拡張子を抜いたもの
+fname_prefix = 'output_image_'; % ファイル名の頭から後ろ6桁と拡張子を抜いたもの
 seconds = (start_num:end_num) * (1/Fs); % 時間
 sizex = SIZE;
 sizey = SIZE;
@@ -38,16 +40,17 @@ for numPath = 2:2
     %%%%%%%%%%%% 設定はここまで %%%%%%%%%%%%
     
     %バッチ処理
-    batch_size =1200; % バッチのサイズ
+    batch_size =2000; % バッチのサイズ
     num_batches = ceil((end_num - start_num + 1) / batch_size);
     all_phase1 = cell(1, num_batches);
     total_processing_time = 0; % 合計処理時間の初期化
-    for batch = 1:num_batches
+
+    parfor batch = 1:num_batches
         batch_start = start_num + (batch - 1) * batch_size;
         batch_end = min(start_num + batch * batch_size - 1, end_num);
         % phase1_batch を一時的な変数にコピー
         tmp_phase1_batch = zeros(1, batch_end - batch_start + 1);
-        h = waitbar(0, sprintf('Processing batch %d/%d...', batch, num_batches));
+
         % 以下の部分を各 v ごとに並列処理
         %%%%%ホログラム画像読み込み%%%%%
         batch_start_time = tic;
@@ -63,9 +66,6 @@ for numPath = 2:2
         
            SIZEX = SIZE;
            SIZEY = SIZE;
-        
-           % ホログラム　干渉縞からグラフを出力
-           %phaseHolo(1,v) = Int_1(SIZEX/2,SIZEY/2);
         
            % ｾﾞﾛﾊﾟﾃﾞｨﾝｸﾞ
            Int_1 = padarray(Int_1,[(SIZE-SIZEX)/2 (SIZE-SIZEY)/2],0,"both");
@@ -94,39 +94,26 @@ for numPath = 2:2
             dy = 1e-4;
             wa = 532e-9; % レーザーの波長
             Recon = nearpropCONV(Int_1, sizex, sizey, dx, dy, 0, 0, wa, d);
-            %Recon = Int_1;
-            %figure(234)   %再構成波面
-            %imshow(angle(Recon));
        
             % 逆伝播計算後の画像から1点の位相を取り出す
             tmp_phase1_batch(v-batch_start+1) = angle(Recon(SIZE/2, SIZE/2));
-            % 進行状況を更新してプログレスバーを表示
-            completion = (v - batch_start + 1) / (batch_end - batch_start + 1);
-            waitbar(completion, h, sprintf('Processing batch %d/%d... %.2f%%', batch, num_batches, completion * 100));
         end
-
-        % 進行状況を更新してプログレスバーに表示
-        %completion = (v - batch_start + 1) / (batch_end - batch_start + 1);
-        %remaining_batches = num_batches - batch;
-        %remaining_time = total_processing_time * (remaining_batches - 1); % 残りバッチの平均処理時間で予測
-        %waitbar(completion, h, sprintf('Processing batch %d/%d... %.2f%% (ETA: %.2f seconds)', batch, num_batches, completion * 100, remaining_time));
-        %batch_end_time = toc(batch_start_time);
-        %total_processing_time = total_processing_time + batch_end_time;
-        tmp_phase1_batch = unwrap(tmp_phase1_batch);
-        all_phase1{batch} = tmp_phase1_batch; % バッチごとの結果を保存
-        close(h);
+            all_phase1{batch} = tmp_phase1_batch; % バッチごとの結果を保存
     end
     phase1 = cat(2, all_phase1{:});
-    %phase1 = unwrap(phase1);  % 位相アンラップ(-πとπの間で飛ばないようにする)
+    phase1 = unwrap(phase1);  % 位相アンラップ(-πとπの間で飛ばないようにする)
+
 end
 
 
 if save_file
     %%%%%測定した生データをcsvに出力%%%%%
+    % ファイル名に日時を結合して新しいファイル名を生成
     ws = wsize1*2+1;
     fname5 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_rshift_B.csv');
+    fname55 = strcat(fname5(1:end-4), '_', currentDateTime, '.csv');
     rphase=[seconds;phase1];
-    csvwrite(fname5,rphase');
+    csvwrite(fname55,rphase');
     figure(1121);
     title('PhaseShift(raw)');
     xlabel('Time [s]');
@@ -155,8 +142,9 @@ if save_file
 
     %%%%%平均化したデータをcsvに出力%%%%%
     fname3 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_Aphase_B.csv');
+    fname33 = strcat(fname3(1:end-4), '_', currentDateTime, '.csv');
     aphase=[seconds;phase2];
-    csvwrite(fname3,aphase');
+    csvwrite(fname33,aphase');
     figure(1122);
     plot(seconds,phase2)
     title('Time-Phase(AVE.)');
@@ -194,8 +182,9 @@ xlabel('Frequency [Hz]');
 ylabel('Spectral intensity []');
 savefig("spectral_raw_B");
 fname6 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_rfreq_B.csv');
+fname66 = strcat(fname6(1:end-4), '_', currentDateTime, '.csv');
 rfreq=[f0_1;phase111];
-csvwrite(fname6,rfreq');
+csvwrite(fname66,rfreq');
 
 %平均化後
 phase12 = phase2(num1:num2);
@@ -209,7 +198,8 @@ xlabel('Frequency [Hz]');
 ylabel('Spectral intensity []');
 savefig("spectral_ave_B");
 fname7 = strcat(folder1,pathName,sprintf('%dx%d_',ws,ws),'Time_Afreq_B.csv');
+fname77 = strcat(fname7(1:end-4), '_', currentDateTime, '.csv');
 nfreq=[f0_1;phase112];
-csvwrite(fname7,nfreq');
+csvwrite(fname77,nfreq');
 
 toc;
